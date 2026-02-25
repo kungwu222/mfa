@@ -145,13 +145,6 @@ export function getCoreCode() {
         await renderSecrets();
 
         // 更新分类过滤器
-        console.log('🔍 updateCategoryFilter 类型:', typeof updateCategoryFilter);
-        const categoryFilter = document.getElementById('categoryFilter');
-        console.log('🔍 categoryFilter 元素:', categoryFilter);
-        console.log('🔍 secrets 数量:', secrets ? secrets.length : 0);
-        if (secrets && secrets.length > 0) {
-          console.log('🔍 密钥分类示例:', secrets.slice(0, 3).map(s => ({ name: s.name, category: s.category })));
-        }
         if (typeof updateCategoryFilter === 'function') {
           updateCategoryFilter();
         }
@@ -722,6 +715,12 @@ export function getCoreCode() {
             }
 
             await renderSecrets();
+
+            // 更新分类过滤器
+            if (typeof updateCategoryFilter === 'function') {
+              updateCategoryFilter();
+            }
+
             hideSecretModal();
           } else {
             const error = await response.json();
