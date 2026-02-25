@@ -140,7 +140,6 @@ export function getHTMLParserCode() {
           const firstRow = rows[0];
           const headers = firstRow.querySelectorAll('th');
           const headerText = Array.from(headers).map(h => h.textContent.trim()).join(',');
-          console.log('检测表头:', headerText);
           return headerText.includes('服务名称') && headerText.includes('密钥');
         });
 
@@ -185,7 +184,6 @@ export function getHTMLParserCode() {
 
                 // 清理密钥
                 const cleanSecret = secret.replace(/\\s+/g, '').toUpperCase();
-                console.log('解析密钥:', { service, account, category, secret: cleanSecret });
                 
                 const digits = digitsIdx >= 0 && digitsIdx < cells.length ? parseInt(cells[digitsIdx].textContent.trim()) || 6 : 6;
                 const period = periodIdx >= 0 && periodIdx < cells.length ? parseInt(cells[periodIdx].textContent.trim()) || 30 : 30;
