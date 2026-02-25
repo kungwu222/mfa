@@ -198,8 +198,8 @@ export function getJSONParserCode() {
 
         jsonData.secrets.forEach((secret, index) => {
           try {
-            const secretKey = secret.secret;
-            console.log('JSON 解析密钥', index + 1, ':', secret);
+            // 清理密钥中的空格
+            const secretKey = (secret.secret || '').replace(/\\s+/g, '').toUpperCase();
             
             const issuer = secret.issuer || secret.name || '';
             const account = secret.account || '';
