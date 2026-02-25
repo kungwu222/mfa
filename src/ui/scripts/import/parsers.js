@@ -192,13 +192,15 @@ export function getJSONParserCode() {
 
       // 检测 2FA 导出格式: { secrets: [...] }
       if (jsonData.secrets && Array.isArray(jsonData.secrets)) {
-        console.log('检测到 2FA JSON 导出格式');
+        console.log('检测到 2FA JSON 导出格式, 共', jsonData.secrets.length, '条');
 
         const parsedItems = [];
 
         jsonData.secrets.forEach((secret, index) => {
           try {
             const secretKey = secret.secret;
+            console.log('JSON 解析密钥', index + 1, ':', secret);
+            
             const issuer = secret.issuer || secret.name || '';
             const account = secret.account || '';
             const type = (secret.type || 'TOTP').toLowerCase();
