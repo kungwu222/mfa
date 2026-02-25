@@ -730,10 +730,10 @@ export function getImportCode() {
      * 解析CSV格式的导入数据
      * 支持2FA导出的CSV格式和Bitwarden Authenticator CSV格式
      * @param {string} csvContent - CSV内容
-     * @returns {Array<string>} - 转换为 otpauth:// URL 格式的数组
+     * @returns {Array} - 包含完整数据的对象数组（包括 category）
      */
     function parseCSVImport(csvContent) {
-      const otpauthUrls = [];
+      const parsedItems = [];
 
       try {
         // 按行分割
@@ -741,11 +741,11 @@ export function getImportCode() {
 
         if (lines.length < 2) {
           console.warn('CSV文件内容太少');
-          return otpauthUrls;
+          return parsedItems;
         }
 
         // 检查第一行是否是标题行
-        const header = lines[0];
+        const header]; = lines[0
 
         // 🆕 检测 Bitwarden Authenticator CSV 格式: folder,favorite,type,name,login_uri,login_totp
         if (header.includes('login_totp') && header.includes('folder')) {
@@ -789,8 +789,12 @@ export function getImportCode() {
         const digitsIndex = headers.findIndex(h => h === '位数' || h.toLowerCase() === 'digits');
         const periodIndex = headers.findIndex(h => h.includes('周期') || h.toLowerCase().includes('period'));
         const algoIndex = headers.findIndex(h => h === '算法' || h.toLowerCase() === 'algorithm');
+        const categoryIndex = headers.findIndex(h => h === '分类' || h.toLowerCase() === 'category');
 
-        console.log('CSV列索引:', { serviceIndex, accountIndex, secretIndex, typeIndex, digitsIndex, periodIndex, algoIndex });
+        console.log('CSV列索引:', { serviceIndex, accountIndex, secretIndex, typeIndex, digitsIndex, periodIndex, algoIndex, categoryIndex });
+
+        // 返回包含完整数据的对象数组（包括 category）
+        const parsedItems = [];
 
         // 解析数据行（跳过标题行）
         for (let i = 1; i < lines.length; i++) {
@@ -807,6 +811,7 @@ export function getImportCode() {
             const digits = digitsIndex >= 0 ? parseInt(fields[digitsIndex]) || 6 : 6;
             const period = periodIndex >= 0 ? parseInt(fields[periodIndex]) || 30 : 30;
             const algo = algoIndex >= 0 ? fields[algoIndex] : 'SHA1';
+            const category = categoryIndex >= 0 ? fields[categoryIndex] : '';
 
             // 验证必要数据
             if (!secret || !secret.trim()) {
@@ -815,7 +820,7 @@ export function getImportCode() {
             }
 
             // 清理密钥
-            const cleanSecret = secret.replace(/\\\\s+/g, '').toUpperCase();
+            const cleanSecret = secret.replace(/\\s+/g, '').toUpperCase();
 
             // 构建 otpauth:// URL
             let label = '';
@@ -837,22 +842,36 @@ export function getImportCode() {
             if (algo !== 'SHA1') params.set('algorithm', algo);
 
             const otpauthUrl = 'otpauth://totp/' + label + '?' + params.toString();
-            otpauthUrls.push(otpauthUrl);
 
-            console.log('CSV第', i + 1, '行解析成功:', service, account);
+            // 返回包含完整数据的对象，包括 category
+            parsedItems.push({
+              otpauthUrl: otpauthUrl,
+              serviceName: service,
+              account: account,
+              secret: cleanSecret,
+              type: 'totp',
+              digits: digits,
+              period: period,
+              algorithm: algo,
+              counter: 0,
+              category: category
+            });
+
+            console.log('CSV第', i + 1, '行解析成功:', service, account, category ? '(分类: ' + category + ')' : '');
 
           } catch (err) {
             console.error('解析CSV第', i + 1, '行失败:', err);
           }
         }
 
-        console.log('成功从CSV解析', otpauthUrls.length, '条密钥');
+        console.log('成功从CSV解析', parsedItems.length, '条密钥');
+        return parsedItems;
 
       } catch (error) {
         console.error('解析CSV失败:', error);
       }
 
-      return otpauthUrls;
+      return parsedItems;
     }
 
     /**
@@ -1212,9 +1231,9 @@ export function getImportCode() {
      * 3. Bitwarden 格式: { items: [...] }
      * 4. LastPass Authenticator 格式: { version: ..., accounts: [...] }
      * 5. andOTP 格式: [{ secret, issuer, label, thumbnail, ... }]
-     * 6. 2FA 导出格式: { secrets: [...] }
+     * 6. 2FA 导出格式: { secrets: [...] } - 返回对象数组（含 category）
      * @param {Object|Array} jsonData - JSON数据
-     * @returns {Array<string>} - 转换为 otpauth:// URL 格式的数组
+     * @returns {Array} - 对象数组（含 category）或字符串数组（otpauth URL）
      */
     function parseJsonImport(jsonData) {
       const otpauthUrls = [];
@@ -1391,6 +1410,9 @@ export function getImportCode() {
         else if (jsonData.secrets && Array.isArray(jsonData.secrets)) {
           console.log('检测到 2FA 导出格式');
 
+          // 返回包含完整数据的对象数组（包括 category）
+          const parsedItems = [];
+
           jsonData.secrets.forEach((secret, index) => {
             try {
               const secretKey = secret.secret;
@@ -1401,6 +1423,7 @@ export function getImportCode() {
               const period = secret.period || 30;
               const algorithm = (secret.algorithm || 'SHA1').toUpperCase();
               const counter = secret.counter || 0;
+              const category = secret.category || '';  // 解析 category
 
               // 构建 otpauth:// URL
               let label = '';
@@ -1423,15 +1446,28 @@ export function getImportCode() {
               if (type === 'hotp') params.set('counter', counter);
 
               const otpauthUrl = 'otpauth://' + type + '/' + label + '?' + params.toString();
-              otpauthUrls.push(otpauthUrl);
+
+              // 返回包含完整数据的对象，包括 category
+              parsedItems.push({
+                otpauthUrl: otpauthUrl,
+                serviceName: issuer,
+                account: account,
+                secret: secretKey,
+                type: type,
+                digits: digits,
+                period: period,
+                algorithm: algorithm,
+                counter: counter,
+                category: category
+              });
 
             } catch (err) {
               console.error('解析 2FA 条目失败 (索引 ' + index + '):', err);
             }
           });
 
-          console.log('成功解析 2FA 格式,共 ' + otpauthUrls.length + ' 条');
-        }
+          console.log('成功解析 2FA 格式,共 ' + parsedItems.length + ' 条');
+          return parsedItems;
         // 检测 Proton Authenticator 格式: { version: 1, entries: [{ content: { uri: "otpauth://..." } }] }
         else if (jsonData.version !== undefined && jsonData.entries && Array.isArray(jsonData.entries)) {
           console.log('检测到 Proton Authenticator 格式 (version: ' + jsonData.version + ')');
@@ -1873,7 +1909,20 @@ export function getImportCode() {
       else if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
         try {
           const jsonData = JSON.parse(text);
-          lines = parseJsonImport(jsonData);
+          const parsedResult = parseJsonImport(jsonData);
+
+          // 检测返回的是对象数组（含category）还是字符串数组（otpauth URL）
+          if (parsedResult.length > 0 && typeof parsedResult[0] === 'object' && parsedResult[0].otpauthUrl) {
+            // 对象数组格式，包含完整数据（包括 category）
+            // 保存 parsedItems 用于后续导入
+            window.__importParsedItems = parsedResult;
+            // 转换为 otpauth URL 数组供后续处理
+            lines = parsedResult.map(item => item.otpauthUrl);
+          } else {
+            // 字符串数组格式（传统 otpauth URL）
+            lines = parsedResult;
+            window.__importParsedItems = null;
+          }
 
           if (lines.length === 0) {
             showCenterToast('❌', '未找到有效的密钥数据');
@@ -1882,19 +1931,22 @@ export function getImportCode() {
         } catch (jsonError) {
           // 不是有效JSON格式,继续按行解析
           console.log('JSON解析失败,按OTPAuth URL格式解析:', jsonError.message);
+          window.__importParsedItems = null;
         }
       }
       // 🆕 检测并解析CSV格式
       else if (text.includes('服务名称,账户信息,密钥') ||
                (text.toLowerCase().includes('service') && text.toLowerCase().includes('secret') && text.includes(','))) {
-        const csvLines = parseCSVImport(text);
+        const csvParsed = parseCSVImport(text);
 
-        if (csvLines.length === 0) {
+        if (csvParsed.length === 0) {
           showCenterToast('❌', '未从CSV文件中提取到有效密钥');
           return;
         }
 
-        lines = csvLines;
+        // CSV 解析现在也返回对象数组（含 category）
+        window.__importParsedItems = csvParsed;
+        lines = csvParsed.map(item => item.otpauthUrl);
       }
 
       lines.forEach((line, index) => {
@@ -1983,9 +2035,26 @@ export function getImportCode() {
                 if (period !== 30 && type === 'totp') displayInfo += ' [' + period + 's]';
                 if (algorithm !== 'SHA1') displayInfo += ' [' + algorithm + ']';
 
+                // 检查是否有从 JSON 解析时保存的 category 信息
+                let category = '';
+                if (window.__importParsedItems && window.__importParsedItems[index]) {
+                  category = window.__importParsedItems[index].category || '';
+                }
+
+                // 如果有 category，在显示中添加
+                if (category) {
+                  displayInfo += ' [' + category + ']';
+                }
+
                 item.innerHTML =
                   '<div class="service-name">✅ ' + displayInfo + '</div>' +
                   '<div class="account-name">' + (account || '(无账户)') + '</div>';
+
+                // 检查是否有从 JSON 解析时保存的 category 信息
+                let category = '';
+                if (window.__importParsedItems && window.__importParsedItems[index]) {
+                  category = window.__importParsedItems[index].category || '';
+                }
 
                 // 保存完整的参数信息
                 importPreviewData.push({
@@ -1997,6 +2066,7 @@ export function getImportCode() {
                   period: period,
                   algorithm: algorithm,
                   counter: counter,
+                  category: category,
                   valid: true,
                   line: index + 1
                 });
@@ -2065,7 +2135,8 @@ export function getImportCode() {
           digits: item.digits || 6,
           period: item.period || 30,
           algorithm: item.algorithm || 'SHA1',
-          counter: item.counter || 0
+          counter: item.counter || 0,
+          category: item.category || ''
         }));
 
         // 调用批量导入 API
@@ -2115,7 +2186,8 @@ export function getImportCode() {
               digits: item.digits || 6,
               period: item.period || 30,
               algorithm: item.algorithm || 'SHA1',
-              counter: item.counter || 0
+              counter: item.counter || 0,
+              category: item.category || ''
             };
 
             console.log('正在导入密钥:', newSecret);
