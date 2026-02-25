@@ -43,22 +43,17 @@ export function getSearchCode() {
 
     // 更新分类下拉列表
     function updateCategoryFilter() {
-      console.log('🔍 [updateCategoryFilter] 被调用');
       const categoryFilter = document.getElementById('categoryFilter');
       const categorySuggestions = document.getElementById('categorySuggestions');
-      console.log('🔍 [updateCategoryFilter] categoryFilter:', categoryFilter);
       if (!categoryFilter) return;
 
       // 收集所有分类
       const categories = new Set();
-      console.log('🔍 [updateCategoryFilter] secrets:', secrets);
       secrets.forEach(secret => {
-        console.log('🔍 [updateCategoryFilter] 检查密钥:', secret.name, '分类:', secret.category);
         if (secret.category && secret.category.trim()) {
           categories.add(secret.category.trim());
         }
       });
-      console.log('🔍 [updateCategoryFilter] 找到的分类:', categories);
 
       // 保存当前选中的分类
       const currentValue = categoryFilter.value;
