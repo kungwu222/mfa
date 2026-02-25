@@ -919,10 +919,10 @@ export function getImportCode() {
      * 2. 2FA HTML 导出格式
      * 3. Ente Auth HTML 导出格式 (.html.txt)
      * @param {string} htmlContent - HTML内容
-     * @returns {Array<string>} - 转换为 otpauth:// URL 格式的数组
+     * @returns {Array} - 包含完整数据的对象数组（包括 category）
      */
     function parseHTMLImport(htmlContent) {
-      const otpauthUrls = [];
+      const parsedItems = [];
 
       try {
         // 创建临时DOM来解析HTML
@@ -1077,7 +1077,7 @@ export function getImportCode() {
 
               // 检测表格格式
               // Aegis格式: Issuer, Name, Type, QR Code, UUID, Note, Favorite, Algo, Digits, Secret, Counter, PIN (12列)
-              // 2FA格式: 服务名称, 账户, 密钥, 类型, 位数, 周期, 算法, 二维码 (8列)
+              // 2FA格式: 服务名称, 账户, 分类, 密钥, 类型, 位数, 周期, 算法, 二维码 (9列)
 
               if (cells.length >= 11) {
                 // Aegis 格式 (12列)
@@ -1090,17 +1090,37 @@ export function getImportCode() {
                 period = 30;
 
                 console.log('检测到 Aegis HTML 格式:', issuer, account);
-              } else if (cells.length >= 7) {
-                // 2FA 格式 (8列)
+              } else if (cells.length >= 8) {
+                // 2FA 格式 (8列或9列 - 9列包含分类)
                 issuer = cells[0].textContent.trim();
                 account = cells[1].textContent.trim();
-                secret = cells[2].textContent.trim();
-                // type = cells[3]
-                digits = parseInt(cells[4].textContent.trim()) || 6;
-                period = parseInt(cells[5].textContent.trim()) || 30;
-                algo = cells[6].textContent.trim() || 'SHA1';
+                
+                // 如果有9列，第3列是分类
+                let category = '';
+                if (cells.length >= 9) {
+                  const categoryText = cells[2].textContent.trim();
+                  if (categoryText && categoryText !== '-') {
+                    category = categoryText;
+                  }
+                  // 密钥在第3列（索引2）
+                  secret = cells[3].textContent.trim();
+                  // type 在第4列
+                  // digits 在第5列
+                  // period 在第6列
+                  // algo 在第7列
+                  digits = parseInt(cells[4].textContent.trim()) || 6;
+                  period = parseInt(cells[5].textContent.trim()) || 30;
+                  algo = cells[6].textContent.trim() || 'SHA1';
+                } else {
+                  // 8列格式（旧版本）
+                  secret = cells[2].textContent.trim();
+                  // type = cells[3]
+                  digits = parseInt(cells[4].textContent.trim()) || 6;
+                  period = parseInt(cells[5].textContent.trim()) || 30;
+                  algo = cells[6].textContent.trim() || 'SHA1';
+                }
 
-                console.log('检测到 2FA HTML 格式:', issuer, account);
+                console.log('检测到 2FA HTML 格式:', issuer, account, category ? '(分类: ' + category + ')' : '');
               } else {
                 console.warn('未知的表格格式,列数:', cells.length);
                 return;
@@ -1912,16 +1932,24 @@ export function getImportCode() {
           const parsedResult = parseJsonImport(jsonData);
 
           // 检测返回的是对象数组（含category）还是字符串数组（otpauth URL）
-          if (parsedResult.length > 0 && typeof parsedResult[0] === 'object' && parsedResult[0].otpauthUrl) {
+          // 对象数组的特征：parsedResult 是数组且第一个元素有 otpauthUrl 属性
+          if (parsedResult && parsedResult.length > 0 && typeof parsedResult[0] === 'object' && parsedResult[0] && parsedResult[0].otpauthUrl) {
             // 对象数组格式，包含完整数据（包括 category）
             // 保存 parsedItems 用于后续导入
             window.__importParsedItems = parsedResult;
             // 转换为 otpauth URL 数组供后续处理
             lines = parsedResult.map(item => item.otpauthUrl);
-          } else {
+            console.log('JSON 解析：检测到对象数组格式（含 category），共 ' + parsedResult.length + ' 条');
+          } else if (Array.isArray(parsedResult)) {
             // 字符串数组格式（传统 otpauth URL）
             lines = parsedResult;
             window.__importParsedItems = null;
+            console.log('JSON 解析：检测到字符串数组格式，共 ' + (parsedResult ? parsedResult.length : 0) + ' 条');
+          } else {
+            // 解析失败或返回 null
+            lines = [];
+            window.__importParsedItems = null;
+            console.log('JSON 解析：解析结果无效');
           }
 
           if (lines.length === 0) {
